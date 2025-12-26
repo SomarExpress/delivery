@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Somar Express - Rider</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        :root { --primary: #667eea; --success: #10b981; --danger: #ef4444; }
+        body { font-family: sans-serif; margin: 0; background: #f3f4f6; }
+        
+        .header { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 15px; position: sticky; top: 0; z-index: 1000; }
+        
+        #map { height: 250px; width: 100%; }
+
+        .order-card { background: white; margin: 15px; padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .order-header { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+        
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; margin-top: 10px; color: white; cursor: pointer; }
+        .btn-arrived { background: var(--primary); }
+        .btn-complete { background: var(--success); }
+        .btn-whatsapp { background: #25D366; text-decoration: none; display: flex; align-items: center; justify-content: center; }
+        
+        .info-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h3 style="margin:0">📦 Somar Express Delivery</h3>
+    <small id="rider-name">Cargando perfil...</small>
+</div>
+
+<div id="map"></div>
+
+<div id="active-orders">
+    <div class="order-card">
+        <div class="order-header">
+            <strong>Orden #5000-6924556</strong>
+            <span style="color: var(--primary)">L 145.00</span>
+        </div>
+        
+        <div class="info-row">📍 <b>Comercio:</b> Pollos El Éxito</div>
+        <div class="info-row">🏠 <b>Cliente:</b> Kevin Ortega</div>
+        <div class="info-row">📝 <b>Nota:</b> Tocar portón negro</div>
+
+        <a href="https://wa.me/50432032345" class="btn btn-whatsapp">💬 Chatear con Cliente</a>
+        <button class="btn btn-arrived" onclick="updateStatus('EN ESTABLECIMIENTO')">🚩 Llegué al Comercio</button>
+        <button class="btn btn-complete" onclick="updateStatus('FINALIZADO')" style="display:none;" id="btn-fin">✅ Entregado</button>
+    </div>
+</div>
+
+<script>
+    // Inicializar Mapa
+    const map = L.map('map').setView([15.6124, -87.9419], 14); // Coordenadas de Choloma
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    // Marcador del Motorista (Cero costo)
+    let riderMarker = L.marker([15.6124, -87.9419]).addTo(map).bindPopup('Tu ubicación');
+
+    // Función para obtener GPS real
+    function trackLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition((pos) => {
+                const { latitude, longitude } = pos.coords;
+                riderMarker.setLatLng([latitude, longitude]);
+                // Aquí enviaríamos la lat/lng a Supabase cada 10 seg
+                console.log("GPS Actualizado:", latitude, longitude);
+            });
+        }
+    }
+
+    async function updateStatus(nuevoEstado) {
+        if(confirm(`¿Cambiar estado a ${nuevoEstado}?`)) {
+            // Aquí se conecta con Supabase:
+            // await supabase.from('pedidos').update({ estatus: nuevoEstado }).eq('no_orden', '...')
+            alert("Estado actualizado en el Canvas de la oficina");
+            if(nuevoEstado === 'EN ESTABLECIMIENTO') document.getElementById('btn-fin').style.display = 'block';
+        }
+    }
+
+    trackLocation();
+</script>
+
+</body>
+</html>
