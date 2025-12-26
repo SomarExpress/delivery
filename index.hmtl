@@ -70,19 +70,40 @@
     }
 
     // 3. Cargar Pedidos en Tiempo Real
-    async function loadOrders() {
-        // Consultar pedidos que no estén finalizados ni cancelados
+async function loadOrders() {
+    console.log("Intentando cargar pedidos...");
+    try {
         let { data: pedidos, error } = await _supabase
             .from('pedidos')
-            .select('*')
-            .in('estatus', ['PENDIENTE', 'ASIGNADO', 'EN CAMINO', 'EN ESTABLECIMIENTO']);
+            .select('*'); // Traemos todo para probar
+
+        if (error) throw error;
 
         const listado = document.getElementById('lista-pedidos');
         
-        if (pedidos.length === 0) {
-            listado.innerHTML = '<p style="text-align:center;">No tienes pedidos pendientes 😴</p>';
+        if (!pedidos || pedidos.length === 0) {
+            listado.innerHTML = `
+                <div style="text-align:center; padding:20px; border:2px dashed #ccc; border-radius:10px;">
+                    <p>📡 Conexión exitosa pero... <br> <b>No hay pedidos en la tabla 'pedidos'</b></p>
+                    <small>Agrega una fila en Supabase con estatus 'PENDIENTE'</small>
+                </div>`;
             return;
         }
+
+        // Si hay pedidos, los dibuja
+        listado.innerHTML = pedidos.map(p => `
+            <div class="order-card">
+                <div class="order-id">#${p.no_orden}</div>
+                <p>Estatus: ${p.estatus}</p>
+                <button class="btn btn-status" onclick="updateStatus(${p.id}, 'EN CAMINO')">Iniciar</button>
+            </div>
+        `).join('');
+
+    } catch (err) {
+        console.error("Error total:", err);
+        document.getElementById('lista-pedidos').innerHTML = `<p style="color:red">Error de Supabase: ${err.message}</p>`;
+    }
+}
 
         listado.innerHTML = pedidos.map(p => {
             // Generar link de Waze usando tu columna de GPS
