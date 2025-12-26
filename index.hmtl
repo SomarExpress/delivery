@@ -2,160 +2,77 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Somar Express - Rider v2</title>
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Somar Rider Debug</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
     <style>
-        :root { --primary: #667eea; --success: #10b981; --dark: #1f2937; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: #f8fafc; color: var(--dark); }
-        
-        .header { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
-        
-        #map { height: 200px; width: 100%; background: #e5e7eb; }
-
-        .content { padding: 15px; }
-        
-        .card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-left: 6px solid var(--primary); }
-        
-        .order-title { display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 1.1em; }
-        .status-pill { background: #dbeafe; color: #1e40af; padding: 4px 10px; border-radius: 20px; font-size: 12px; }
-        
-        .info-item { margin: 12px 0; font-size: 14px; display: flex; align-items: center; gap: 8px; }
-        
-        .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: bold; font-size: 15px; margin-top: 10px; cursor: pointer; transition: 0.2s; color: white; }
-        .btn-status { background: var(--primary); }
-        .btn-success { background: var(--success); }
-        .btn-waze { background: #333; display: block; text-align: center; text-decoration: none; }
-        
-        .empty-state { text-align: center; padding: 40px; color: #64748b; }
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; }
+        .status-box { padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 2px solid #ccc; }
+        .error { background: #fee2e2; border-color: #ef4444; color: #b91c1c; }
+        .success { background: #dcfce7; border-color: #10b981; color: #166534; }
+        .order-card { background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 10px; margin-top: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <h2 style="margin:0; font-size: 1.2em;">🛵 SOMAR EXPRESS RIDER</h2>
-    <div id="connection-status" style="font-size: 10px; opacity: 0.8;">Conectando a base de datos...</div>
-</div>
-
-<div id="map"></div>
-
-<div class="content" id="app">
-    <div id="lista-pedidos">
-        <div class="empty-state">Buscando tus pedidos asignados...</div>
-    </div>
-</div>
+    <h1>🛵 Somar Rider App</h1>
+    <div id="debug-status" class="status-box">Iniciando conexión...</div>
+    
+    <h3>Pedidos en tiempo real:</h3>
+    <div id="lista-pedidos">Esperando datos...</div>
 
 <script>
-    // CREDENCIALES
+    // TUS CREDENCIALES
     const SUPABASE_URL = 'https://jndclfovljorerlfisst.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_QEIugDnx_MH6XDtqsswdKA_SVWBvjiz';
-    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    let map, riderMarker;
+    const debugEl = document.getElementById('debug-status');
+    const listaEl = document.getElementById('lista-pedidos');
 
-    // Inicializar App
-    async function init() {
-        initMap();
-        checkConnection();
-        loadOrders();
-        setupRealtime();
-        startGPSTracking();
-    }
-
-    function initMap() {
-        map = L.map('map', { zoomControl: false }).setView([15.6124, -87.9419], 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        riderMarker = L.marker([15.6124, -87.9419]).addTo(map).bindPopup('Tu ubicación');
-    }
-
-    async function checkConnection() {
-        const statusEl = document.getElementById('connection-status');
+    async function iniciarApp() {
         try {
-            const { data, error } = await _supabase.from('pedidos').select('id').limit(1);
-            if (error) throw error;
-            statusEl.innerText = "🟢 EN LÍNEA - TIEMPO REAL ACTIVO";
-        } catch (e) {
-            statusEl.innerText = "🔴 ERROR DE CONEXIÓN: " + e.message;
-            statusEl.style.color = "#ff8a8a";
-        }
-    }
+            debugEl.innerHTML = "🔗 Intentando conectar a Supabase...";
+            const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    async function loadOrders() {
-        const { data: pedidos, error } = await _supabase
-            .from('pedidos')
-            .select('*')
-            .in('estatus', ['PENDIENTE', 'ASIGNADO', 'EN CAMINO', 'EN ESTABLECIMIENTO'])
-            .order('creado_at', { ascending: false });
+            // 1. Prueba de fuego: Leer cualquier cosa de la tabla pedidos
+            const { data, error } = await _supabase
+                .from('pedidos')
+                .select('*')
+                .limit(5);
 
-        const container = document.getElementById('lista-pedidos');
+            if (error) {
+                debugEl.className = "status-box error";
+                debugEl.innerHTML = "❌ Error de Supabase: " + error.message;
+                return;
+            }
 
-        if (error) {
-            container.innerHTML = `<div class="empty-state">Error al cargar: ${error.message}</div>`;
-            return;
-        }
+            debugEl.className = "status-box success";
+            debugEl.innerHTML = "✅ ¡Conectado con éxito! Filas encontradas: " + data.length;
 
-        if (!pedidos || pedidos.length === 0) {
-            container.innerHTML = `<div class="empty-state">📭 No tienes pedidos activos.<br><small>Espera a que te asignen uno en el Canvas.</small></div>`;
-            return;
-        }
-
-        container.innerHTML = pedidos.map(p => {
-            const gps = p.gps_entrega || "15.6124,-87.9419";
-            return `
-                <div class="card">
-                    <div class="order-title">
-                        <span>📦 Orden #${p.no_orden}</span>
-                        <span class="status-pill">${p.estatus}</span>
+            if (data.length === 0) {
+                listaEl.innerHTML = `
+                    <div class="order-card">
+                        <b>La tabla está vacía.</b><br>
+                        Entra a Supabase y agrega un pedido con estatus 'PENDIENTE' para verlo aquí.
+                    </div>`;
+            } else {
+                listaEl.innerHTML = data.map(p => `
+                    <div class="order-card">
+                        <b>Orden: #${p.no_orden || p.id}</b><br>
+                        Estatus: ${p.estatus}<br>
+                        Cliente: ${p.cliente_nombre || 'No asignado'}
                     </div>
-                    
-                    <div class="info-item">🏪 <b>Comercio:</b> ${p.comercio_nombre || 'Somar Express'}</div>
-                    <div class="info-item">🏠 <b>Entrega:</b> ${p.direccion_entrega || 'Consultar con despacho'}</div>
-                    <div class="info-item">💰 <b>Total Cobro:</b> L ${p.vt_envio || '0.00'}</div>
+                `).join('');
+            }
 
-                    <button class="btn btn-status" onclick="updateStatus(${p.id}, 'EN CAMINO')">🚩 Iniciar Entrega</button>
-                    <button class="btn btn-success" onclick="updateStatus(${p.id}, 'FINALIZADO')">✅ Finalizar Pedido</button>
-                    <a href="https://waze.com/ul?ll=${gps}&navigate=yes" target="_blank" class="btn btn-waze">🧭 Navegar con Waze</a>
-                </div>
-            `;
-        }).join('');
+        } catch (err) {
+            debugEl.className = "status-box error";
+            debugEl.innerHTML = "💥 Error crítico de JavaScript: " + err.message;
+        }
     }
 
-    function setupRealtime() {
-        _supabase
-            .channel('db-changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
-                console.log("Actualizando por cambio en DB...");
-                loadOrders();
-            })
-            .subscribe();
-    }
-
-    async function updateStatus(id, nuevoEstatus) {
-        if (!confirm(`¿Confirmar cambio a ${nuevoEstatus}?`)) return;
-        
-        const { error } = await _supabase
-            .from('pedidos')
-            .update({ estatus: nuevoEstatus })
-            .eq('id', id);
-
-        if (error) alert("Error: " + error.message);
-    }
-
-    function startGPSTracking() {
-        navigator.geolocation.watchPosition((pos) => {
-            const { latitude, longitude } = pos.coords;
-            riderMarker.setLatLng([latitude, longitude]);
-            if (map) map.panTo([latitude, longitude]);
-        }, null, { enableHighAccuracy: true });
-    }
-
-    // Arrancar
-    window.onload = init;
+    // Ejecutar al cargar la página
+    window.onload = iniciarApp;
 </script>
 </body>
 </html>
