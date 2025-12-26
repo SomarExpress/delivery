@@ -2,167 +2,160 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Somar Express - Rider App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Somar Express - Rider v2</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <style>
-        :root { --primary: #667eea; --success: #10b981; --warning: #f59e0b; --danger: #ef4444; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: #f3f4f6; color: #1f2937; }
-        .header { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        #map { height: 200px; width: 100%; border-bottom: 2px solid #ddd; }
-        .container { padding: 15px; }
-        .order-card { background: white; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 5px solid var(--primary); }
-        .order-id { font-weight: bold; font-size: 1.2em; display: flex; justify-content: space-between; }
-        .info-group { margin: 15px 0; font-size: 14px; }
-        .info-label { color: #6b7280; font-weight: 600; text-transform: uppercase; font-size: 11px; }
-        .btn { width: 100%; padding: 16px; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; margin-top: 10px; color: white; cursor: pointer; transition: 0.3s; }
+        :root { --primary: #667eea; --success: #10b981; --dark: #1f2937; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: #f8fafc; color: var(--dark); }
+        
+        .header { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        
+        #map { height: 200px; width: 100%; background: #e5e7eb; }
+
+        .content { padding: 15px; }
+        
+        .card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-left: 6px solid var(--primary); }
+        
+        .order-title { display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 1.1em; }
+        .status-pill { background: #dbeafe; color: #1e40af; padding: 4px 10px; border-radius: 20px; font-size: 12px; }
+        
+        .info-item { margin: 12px 0; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+        
+        .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: bold; font-size: 15px; margin-top: 10px; cursor: pointer; transition: 0.2s; color: white; }
         .btn-status { background: var(--primary); }
-        .btn-complete { background: var(--success); }
-        .btn-waze { background: #333; margin-top: 15px; }
-        .status-badge { background: #e0e7ff; color: #3730a3; padding: 4px 10px; border-radius: 20px; font-size: 12px; }
+        .btn-success { background: var(--success); }
+        .btn-waze { background: #333; display: block; text-align: center; text-decoration: none; }
+        
+        .empty-state { text-align: center; padding: 40px; color: #64748b; }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <h2 style="margin:0">🛵 Somar Rider</h2>
-    <small>Sincronización en tiempo real</small>
+    <h2 style="margin:0; font-size: 1.2em;">🛵 SOMAR EXPRESS RIDER</h2>
+    <div id="connection-status" style="font-size: 10px; opacity: 0.8;">Conectando a base de datos...</div>
 </div>
 
 <div id="map"></div>
 
-<div class="container" id="app-container">
+<div class="content" id="app">
     <div id="lista-pedidos">
-        <p style="text-align:center; color:#666;">Buscando pedidos asignados...</p>
+        <div class="empty-state">Buscando tus pedidos asignados...</div>
     </div>
 </div>
 
 <script>
-    // TUS DATOS DE CONEXIÓN ACTUALIZADOS
+    // CREDENCIALES
     const SUPABASE_URL = 'https://jndclfovljorerlfisst.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_QEIugDnx_MH6XDtqsswdKA_SVWBvjiz';
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let map, riderMarker;
 
-    // 1. Inicializar Mapa
+    // Inicializar App
+    async function init() {
+        initMap();
+        checkConnection();
+        loadOrders();
+        setupRealtime();
+        startGPSTracking();
+    }
+
     function initMap() {
-        map = L.map('map').setView([15.6124, -87.9419], 14);
+        map = L.map('map', { zoomControl: false }).setView([15.6124, -87.9419], 14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        riderMarker = L.marker([15.6124, -87.9419]).addTo(map).bindPopup('Tú (Motorista)');
+        riderMarker = L.marker([15.6124, -87.9419]).addTo(map).bindPopup('Tu ubicación');
     }
 
-    // 2. Rastrear GPS y actualizar Supabase
-    function startTracking(riderId) {
-        navigator.geolocation.watchPosition(async (pos) => {
-            const { latitude, longitude } = pos.coords;
-            riderMarker.setLatLng([latitude, longitude]);
-            
-            // Actualizar ubicación en Supabase para que se vea en el Canvas de la oficina
-            await _supabase
-                .from('repartidores')
-                .update({ lat_actual: latitude, lng_actual: longitude, ultima_conexion: new Date() })
-                .eq('id_delivery', riderId);
-        });
+    async function checkConnection() {
+        const statusEl = document.getElementById('connection-status');
+        try {
+            const { data, error } = await _supabase.from('pedidos').select('id').limit(1);
+            if (error) throw error;
+            statusEl.innerText = "🟢 EN LÍNEA - TIEMPO REAL ACTIVO";
+        } catch (e) {
+            statusEl.innerText = "🔴 ERROR DE CONEXIÓN: " + e.message;
+            statusEl.style.color = "#ff8a8a";
+        }
     }
 
-    // 3. Cargar Pedidos en Tiempo Real
-async function loadOrders() {
-    console.log("Intentando cargar pedidos...");
-    try {
-        let { data: pedidos, error } = await _supabase
+    async function loadOrders() {
+        const { data: pedidos, error } = await _supabase
             .from('pedidos')
-            .select('*'); // Traemos todo para probar
+            .select('*')
+            .in('estatus', ['PENDIENTE', 'ASIGNADO', 'EN CAMINO', 'EN ESTABLECIMIENTO'])
+            .order('creado_at', { ascending: false });
 
-        if (error) throw error;
+        const container = document.getElementById('lista-pedidos');
 
-        const listado = document.getElementById('lista-pedidos');
-        
-        if (!pedidos || pedidos.length === 0) {
-            listado.innerHTML = `
-                <div style="text-align:center; padding:20px; border:2px dashed #ccc; border-radius:10px;">
-                    <p>📡 Conexión exitosa pero... <br> <b>No hay pedidos en la tabla 'pedidos'</b></p>
-                    <small>Agrega una fila en Supabase con estatus 'PENDIENTE'</small>
-                </div>`;
+        if (error) {
+            container.innerHTML = `<div class="empty-state">Error al cargar: ${error.message}</div>`;
             return;
         }
 
-        // Si hay pedidos, los dibuja
-        listado.innerHTML = pedidos.map(p => `
-            <div class="order-card">
-                <div class="order-id">#${p.no_orden}</div>
-                <p>Estatus: ${p.estatus}</p>
-                <button class="btn btn-status" onclick="updateStatus(${p.id}, 'EN CAMINO')">Iniciar</button>
-            </div>
-        `).join('');
+        if (!pedidos || pedidos.length === 0) {
+            container.innerHTML = `<div class="empty-state">📭 No tienes pedidos activos.<br><small>Espera a que te asignen uno en el Canvas.</small></div>`;
+            return;
+        }
 
-    } catch (err) {
-        console.error("Error total:", err);
-        document.getElementById('lista-pedidos').innerHTML = `<p style="color:red">Error de Supabase: ${err.message}</p>`;
-    }
-}
-
-        listado.innerHTML = pedidos.map(p => {
-            // Generar link de Waze usando tu columna de GPS
+        container.innerHTML = pedidos.map(p => {
             const gps = p.gps_entrega || "15.6124,-87.9419";
-            const wazeUrl = `https://waze.com/ul?ll=${gps}&navigate=yes`;
-
             return `
-                <div class="order-card">
-                    <div class="order-id">
-                        #${p.no_orden || 'Sin número'}
-                        <span class="status-badge">${p.estatus}</span>
+                <div class="card">
+                    <div class="order-title">
+                        <span>📦 Orden #${p.no_orden}</span>
+                        <span class="status-pill">${p.estatus}</span>
                     </div>
                     
-                    <div class="info-group">
-                        <div class="info-label">📍 Comercio</div>
-                        <div><b>${p.comercio_id || 'Comercio Somar'}</b></div>
-                    </div>
+                    <div class="info-item">🏪 <b>Comercio:</b> ${p.comercio_nombre || 'Somar Express'}</div>
+                    <div class="info-item">🏠 <b>Entrega:</b> ${p.direccion_entrega || 'Consultar con despacho'}</div>
+                    <div class="info-item">💰 <b>Total Cobro:</b> L ${p.vt_envio || '0.00'}</div>
 
-                    <div class="info-group">
-                        <div class="info-label">🏠 Entrega en</div>
-                        <div>${p.direccion_entrega || 'Dirección no especificada'}</div>
-                    </div>
-
-                    <div class="info-group">
-                        <div class="info-label">💰 Cobro Total</div>
-                        <div style="font-size:1.1em; color:var(--success); font-weight:bold;">L ${p.vt_envio || '0.00'}</div>
-                    </div>
-
-                    <button class="btn btn-status" onclick="updateStatus(${p.id}, 'EN CAMINO')">🚩 Iniciar Ruta</button>
-                    <button class="btn btn-complete" onclick="updateStatus(${p.id}, 'FINALIZADO')">✅ Entregado</button>
-                    <a href="${wazeUrl}" target="_blank" class="btn btn-waze" style="text-decoration:none; display:block; text-align:center;">🧭 Abrir en Waze</a>
+                    <button class="btn btn-status" onclick="updateStatus(${p.id}, 'EN CAMINO')">🚩 Iniciar Entrega</button>
+                    <button class="btn btn-success" onclick="updateStatus(${p.id}, 'FINALIZADO')">✅ Finalizar Pedido</button>
+                    <a href="https://waze.com/ul?ll=${gps}&navigate=yes" target="_blank" class="btn btn-waze">🧭 Navegar con Waze</a>
                 </div>
             `;
         }).join('');
     }
 
-    async function updateStatus(id, nuevoEstatus) {
-        const { error } = await _supabase
-            .from('pedidos')
-            .update({ estatus: nuevoEstatus, hora_finalizado: nuevoEstatus === 'FINALIZADO' ? new Date() : null })
-            .eq('id', id);
-        
-        if (error) alert("Error: " + error.message);
-        else loadOrders();
+    function setupRealtime() {
+        _supabase
+            .channel('db-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
+                console.log("Actualizando por cambio en DB...");
+                loadOrders();
+            })
+            .subscribe();
     }
 
-    // Escuchar cambios en la base de datos (TIEMPO REAL PURO)
-    _supabase
-        .channel('cambios-pedidos')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, payload => {
-            console.log('Cambio detectado!');
-            loadOrders();
-        })
-        .subscribe();
+    async function updateStatus(id, nuevoEstatus) {
+        if (!confirm(`¿Confirmar cambio a ${nuevoEstatus}?`)) return;
+        
+        const { error } = await _supabase
+            .from('pedidos')
+            .update({ estatus: nuevoEstatus })
+            .eq('id', id);
 
-    // Iniciar App
-    initMap();
-    loadOrders();
+        if (error) alert("Error: " + error.message);
+    }
+
+    function startGPSTracking() {
+        navigator.geolocation.watchPosition((pos) => {
+            const { latitude, longitude } = pos.coords;
+            riderMarker.setLatLng([latitude, longitude]);
+            if (map) map.panTo([latitude, longitude]);
+        }, null, { enableHighAccuracy: true });
+    }
+
+    // Arrancar
+    window.onload = init;
 </script>
-
 </body>
 </html>
